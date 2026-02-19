@@ -100,7 +100,13 @@ def pull_asset(update, tiny=False):
                 # Prepare for extraction
                 if os.path.exists(assets_folder):
                     logger.info("Remove existing assets of objects. Files: {}".format(os.listdir(assets_folder)))
-                    shutil.rmtree(assets_folder, ignore_errors=True)
+                    # Clear contents but keep directory (may be a Docker volume mount point)
+                    for item in os.listdir(assets_folder):
+                        item_path = os.path.join(assets_folder, item)
+                        if os.path.isdir(item_path):
+                            shutil.rmtree(item_path, ignore_errors=True)
+                        else:
+                            os.remove(item_path)
                 if os.path.exists(temp_assets_folder):
                     shutil.rmtree(temp_assets_folder, ignore_errors=True)
 
@@ -114,26 +120,38 @@ def pull_asset(update, tiny=False):
                     print("Files extracted successfully!")
                 except subprocess.CalledProcessError as e:
                     print(f"Extraction failed: {e}")
-                shutil.move(str(temp_assets_folder / 'assets'), str(ROOT_DIR))
+                # Use copytree instead of move to handle existing directory (Docker volume mount)
+                shutil.copytree(str(temp_assets_folder / 'assets'), str(assets_folder), dirs_exist_ok=True)
 
                 # Prepare for extraction
-                if os.path.exists(str(assets_folder).replace('assets', 'assets_pedestrain')):
+                pede_assets_folder = str(assets_folder).replace('assets', 'assets_pedestrain')
+                pede_temp_folder = str(temp_assets_folder).replace('assets', 'assets_pedestrain')
+                if os.path.exists(pede_assets_folder):
                     logger.info(
                         "Remove existing assets of agents. Files: {}".format(
-                            os.listdir(str(assets_folder).replace('assets', 'assets_pedestrain'))
+                            os.listdir(pede_assets_folder)
                         )
                     )
-                    shutil.rmtree(str(assets_folder).replace('assets', 'assets_pedestrain'), ignore_errors=True)
-                if os.path.exists(str(temp_assets_folder).replace('assets', 'assets_pedestrain')):
-                    shutil.rmtree(str(temp_assets_folder).replace('assets', 'assets_pedestrain'), ignore_errors=True)
+                    for item in os.listdir(pede_assets_folder):
+                        item_path = os.path.join(pede_assets_folder, item)
+                        if os.path.isdir(item_path):
+                            shutil.rmtree(item_path, ignore_errors=True)
+                        else:
+                            os.remove(item_path)
+                if os.path.exists(pede_temp_folder):
+                    shutil.rmtree(pede_temp_folder, ignore_errors=True)
 
                 # Extract to temporary directory
                 logger.info("Extracting assets of agents.")
                 shutil.unpack_archive(
                     filename=str(zip_path).replace('assets.zip', 'assets_pedestrain.zip'),
-                    extract_dir=str(temp_assets_folder).replace('assets', 'assets_pedestrain')
+                    extract_dir=pede_temp_folder
                 )
-                shutil.move(str(temp_assets_folder / 'assets').replace('assets', 'assets_pedestrain'), str(ROOT_DIR))
+                shutil.copytree(
+                    str(temp_assets_folder / 'assets').replace('assets', 'assets_pedestrain'),
+                    pede_assets_folder,
+                    dirs_exist_ok=True
+                )
             else:
                 # Download assets
                 logger.info("Thank you for using MetaUrban! We would download tiny version assets for you.")
@@ -146,14 +164,19 @@ def pull_asset(update, tiny=False):
                 # Prepare for extraction
                 if os.path.exists(assets_folder):
                     logger.info("Remove existing assets of objects. Files: {}".format(os.listdir(assets_folder)))
-                    shutil.rmtree(assets_folder, ignore_errors=True)
+                    for item in os.listdir(assets_folder):
+                        item_path = os.path.join(assets_folder, item)
+                        if os.path.isdir(item_path):
+                            shutil.rmtree(item_path, ignore_errors=True)
+                        else:
+                            os.remove(item_path)
                 if os.path.exists(temp_assets_folder):
                     shutil.rmtree(temp_assets_folder, ignore_errors=True)
 
                 # Extract to temporary directory
                 logger.info("Extracting assets of objects.")
                 shutil.unpack_archive(filename=str(zip_path), extract_dir=temp_assets_folder)
-                shutil.move(str(temp_assets_folder / 'assets'), str(ROOT_DIR))
+                shutil.copytree(str(temp_assets_folder / 'assets'), str(assets_folder), dirs_exist_ok=True)
 
     except Timeout:  # Timeout will be raised if the lock can not be acquired in 1s.
         logger.info(

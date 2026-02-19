@@ -10,7 +10,7 @@ ENV LC_ALL=C.UTF-8
 # ---- 1. System dependencies ------------------------------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.10 python3.10-dev python3.10-venv python3-pip \
-    cmake make gcc g++ git curl wget lsb-release gnupg2 software-properties-common \
+    cmake make gcc g++ git curl wget unzip lsb-release gnupg2 software-properties-common \
     libgl1-mesa-glx libgl1-mesa-dri libglib2.0-0 libsm6 libxrender1 \
     libfontconfig1 libxext6 libx11-6 libxcb1 libxkbcommon0 \
     mesa-utils x11-xserver-utils \

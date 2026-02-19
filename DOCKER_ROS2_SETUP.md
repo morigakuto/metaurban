@@ -45,10 +45,21 @@ sudo usermod -aG docker $USER
 # 1. ビルド（初回のみ）
 ./run.sh build
 
-# 2. デモで動作確認
+# 2. アセットのダウンロード（初回のみ）
+#    MetaUrban の 3D モデル等は別途ダウンロードが必要。
+#    コンテナに入って pull_asset を実行する。
+./run.sh start
+# コンテナ内で:
+python3 -m metaurban.pull_asset
+# → フォーム (https://forms.office.com/r/tFBRFk7u4E) に記入し、コードを入力
+# → アセットがダウンロード・展開される（約 4GB）
+# → 完了したら exit でコンテナを抜ける
+# ※ Docker ボリュームに保存されるので、次回以降は不要
+
+# 3. デモで動作確認
 ./run.sh demo
 
-# 3. ROS2 連携
+# 4. ROS2 連携
 ./run.sh ros
 # コンテナ内で tmux 等を使い2ターミナル:
 #   ターミナル1: ros2 launch metaurban_example_bridge metaurban_example_bridge.launch.py
@@ -75,10 +86,50 @@ MetaUrban (Panda3D)                    ROS2 ノード
 3. **ROS2 ブリッジテスト** — `./run.sh ros` → 2ターミナルで起動し `ros2 topic list` でトピックが見えるか確認
 4. **ビルドエラーの修正** — Dockerfile.ros2 は未テストなので、依存関係の不足やパス間違い等があれば修正する
 
+## トラブルシューティング
+
+### `Asset version file does not exist! Files: []`
+
+アセット（3Dモデル等）がダウンロードされていない。`./run.sh demo` を実行する前に、コンテナ内でアセットをダウンロードする必要がある。
+
+```bash
+./run.sh start
+# コンテナ内で:
+python3 -m metaurban.pull_asset
+```
+
+`docker-compose.yml` で `metaurban-assets` ボリュームが `/metaurban/metaurban/assets` にマウントされており、初回はボリュームが空のため発生する。一度ダウンロードすればボリュームに保持される。
+
+### `unzip: not found` (アセット展開時)
+
+Dockerfile に `unzip` が含まれていなかった（修正済み）。再ビルドが必要：
+
+```bash
+./run.sh build
+```
+
+もし再ビルドせずに対処したい場合は、コンテナ内で直接インストール：
+
+```bash
+apt-get update && apt-get install -y unzip
+```
+
+### `containerd.io : 競合: containerd`（Docker インストール時）
+
+Ubuntu 標準の `containerd` と Docker 公式リポジトリの `containerd.io` が競合している。どちらかに統一する：
+
+```bash
+# Docker 公式リポジトリ版を使う場合（推奨）:
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+# Ubuntu 標準パッケージを使う場合:
+sudo apt-get remove -y containerd.io
+sudo apt-get install -y docker.io docker-compose-plugin
+```
+
 ## 既知の注意点
 
-- `Dockerfile.ros2` は **未テスト**。ビルドエラーが出る可能性がある
-- MetaUrban のアセット（3Dモデル）は初回実行時に自動ダウンロードされる（登録フォームが出る場合あり）
+- MetaUrban のアセット（3Dモデル）はイメージに含まれず、初回起動時に手動ダウンロードが必要（登録フォーム記入 + コード入力）
 - `docker-compose.yml` は `network_mode: host` なのでコンテナ内の ROS2 トピックがホストからも見える
 - conda は使わず、システム Python (3.10) に直接 pip install している（ROS2 との競合回避）
 - 既存の `Dockerfile`（Anaconda ベース）は残してあるが、ROS2 非対応で ORCA 未コンパイルなので今回は使わない
