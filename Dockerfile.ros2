@@ -1,0 +1,73 @@
+# =============================================================================
+# MetaUrban + ROS2 Humble  (Ubuntu 22.04 / NVIDIA GPU)
+# =============================================================================
+FROM nvidia/opengl:1.2-glvnd-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+
+# ---- 1. System dependencies ------------------------------------------------
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.10 python3.10-dev python3.10-venv python3-pip \
+    cmake make gcc g++ git curl wget lsb-release gnupg2 software-properties-common \
+    libgl1-mesa-glx libgl1-mesa-dri libglib2.0-0 libsm6 libxrender1 \
+    libfontconfig1 libxext6 libx11-6 libxcb1 libxkbcommon0 \
+    mesa-utils x11-xserver-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Make python3.10 the default
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1 \
+    && update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1
+
+# ---- 2. Install ROS2 Humble ------------------------------------------------
+RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
+    -o /usr/share/keyrings/ros-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] \
+    http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" \
+    > /etc/apt/sources.list.d/ros2.list
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ros-humble-desktop \
+    ros-humble-vision-msgs \
+    ros-humble-vision-msgs-rviz-plugins \
+    ros-humble-cv-bridge \
+    python3-colcon-common-extensions \
+    python3-rosdep \
+    && rm -rf /var/lib/apt/lists/*
+
+# ---- 3. Copy MetaUrban source ----------------------------------------------
+WORKDIR /metaurban
+COPY . .
+
+# ---- 4. Install MetaUrban Python dependencies ------------------------------
+RUN pip3 install --no-cache-dir -e ".[ros]" \
+    && pip3 install --no-cache-dir \
+    stable_baselines3 imitation tensorboard wandb scikit-image pyyaml gdown \
+    "pybind11[global]"
+
+# ---- 5. Compile ORCA algorithm ----------------------------------------------
+RUN cd metaurban/orca_algo \
+    && rm -rf build \
+    && mkdir build && cd build \
+    && cmake -DCMAKE_BUILD_TYPE=Release \
+             -DFULL_OUTPUT_FLAG=OFF \
+             -DFULL_LOG_FLAG=OFF \
+             -DMAPF_LOG_FLAG=OFF .. \
+    && make -j$(nproc)
+
+# ---- 6. Build ROS2 bridge --------------------------------------------------
+SHELL ["/bin/bash", "-c"]
+RUN source /opt/ros/humble/setup.bash \
+    && cd bridges/ros_bridge \
+    && rosdep init || true \
+    && rosdep update \
+    && rosdep install --from-paths src --ignore-src -y \
+    && colcon build
+
+# ---- 7. Entrypoint ---------------------------------------------------------
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["bash"]
