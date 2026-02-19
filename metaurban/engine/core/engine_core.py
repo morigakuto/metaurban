@@ -112,7 +112,7 @@ class EngineCore(ShowBase.ShowBase):
     #   loadPrcFileData("", "basic-shaders-only true")
     else:
         loadPrcFileData("", "framebuffer-multisample 1")
-        loadPrcFileData("", "multisamples 8")
+        loadPrcFileData("", "multisamples 2")
 
     def __init__(self, global_config):
         # if EngineCore.global_config is not None:
@@ -293,7 +293,7 @@ class EngineCore(ShowBase.ShowBase):
                     )
                 else:
                     self.pbrpipe = init(
-                        msaa_samples=16,
+                        msaa_samples=4,
                         use_hardware_skinning=True,
                         # use_normal_maps=True,
                         use_330=False
